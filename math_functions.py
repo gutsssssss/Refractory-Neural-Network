@@ -2,7 +2,6 @@ import numpy as np
 import torch
 
 
-# 线性函数
 def linear(x):
     return x
 
@@ -11,17 +10,15 @@ def linear_derivative(x):
     return 1
 
 
-# ReLU函数及其导数
 def relu(x):
     return np.maximum(0, x)
 
 
 def relu_derivative(x):
-    x = np.array(x)  # 将列表转换为NumPy数组
+    x = np.array(x)
     return torch.Tensor(np.where(x > 0, 1, 0))
 
 
-# tanh函数及其导数
 def tanh(x):
     return np.tanh(x)
 
@@ -30,7 +27,6 @@ def tanh_derivative(x):
     return 1 - np.tanh(x) ** 2
 
 
-# sigmoid函数及其导数
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
@@ -40,7 +36,6 @@ def sigmoid_derivative(x):
     return s * (1 - s)
 
 
-# step函数
 def step(x, threshold=5, value=1):
     if x > threshold:
         return value
@@ -48,7 +43,6 @@ def step(x, threshold=5, value=1):
         return 0
 
 
-# softmax函数及其导数
 def softmax(x):
     x_max, _ = torch.max(x, dim=1, keepdim=True)
     e_x = torch.exp(x - x_max)
@@ -77,11 +71,9 @@ def lrArray(epochs, initial_lr, decay_rate):
 
 
 def normalize_input(input_tensor: torch.Tensor) -> torch.Tensor:
-    # 计算输入张量的均值和标准差
     mean = torch.mean(input_tensor)
     std = torch.std(input_tensor)
 
-    # 归一化输入张量
     normalized_tensor = (input_tensor - mean) / (std + 1e-25)
 
     return normalized_tensor
