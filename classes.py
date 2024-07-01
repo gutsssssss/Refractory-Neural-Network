@@ -130,7 +130,7 @@ def plot_loss_curve(model):
 def plot_output(output: list[torch.Tensor]):
     length = math.ceil(math.sqrt(len(output))) + 1
     for i in range(len(output)):
-        plt.subplot(length, length, i + 1)  # l行l列
+        plt.subplot(length, length, i + 1)
         plt.hist(output[i].flatten(), facecolor='g')
         plt.title('layer ' + i.__str__())
         plt.xlim([-100, 100])
@@ -158,7 +158,6 @@ def calculateAccuracy(pred_label, true_label):
     return acc / len(pred_label)
 
 
-# 创建一个字典来存储激活函数
 activation_functions = {
     'linear': mf.linear,
     'sigmoid': mf.sigmoid,
@@ -168,7 +167,6 @@ activation_functions = {
     'step': mf.step
 }
 
-# 创建一个字典来存储激活函数的导数
 activation_derivatives = {
     'linear': mf.linear_derivative,
     'sigmoid': mf.sigmoid_derivative,
