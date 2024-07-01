@@ -77,11 +77,11 @@ class Neuron:
 
         a = self.activation_functions(self.g, threshold=self.a_threshold, value=self.a_value)
 
-        self.updateGate(a)
+        self.update(a)
 
         return a
 
-    def updateGate(self, a):
+    def update(self, a):
         # different gate values corresponding to different neuron phases
         rest = torch.tensor([1, 1])
         active = torch.tensor([0, 1])
