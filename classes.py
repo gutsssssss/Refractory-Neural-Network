@@ -67,7 +67,6 @@ class Neuron:
 
     def forward(self, inputs: torch.Tensor, bias) -> torch.Tensor:
         # calculate weighted inputs
-        a = 0
         weighted_inputs = torch.matmul(self.weights, inputs) + bias
 
         # gate 1: control the input in, all or zero
