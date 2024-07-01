@@ -49,12 +49,15 @@ class Dataset:
 class Neuron:
     def __init__(self, num_inputs: int):
         self.weights = torch.randn(num_inputs)
+        self.bias = torch.randn(1)
         self.activation_functions = activation_functions['step']
         self.gate_value = torch.tensor([1, 1])
         self.a_threshold = 1
         self.a_value = 1
         self.g = 0
         self.age = 0
+        self.age_list = []
+        self.state = []
 
         # timers
         self.timer_a = 0
@@ -65,52 +68,60 @@ class Neuron:
         self.t_a = 5
         self.t_rf = 3
 
-    def forward(self, inputs: torch.Tensor, bias) -> torch.Tensor:
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         # calculate weighted inputs
-        weighted_inputs = torch.matmul(self.weights, inputs) + bias
+        weighted_inputs = torch.matmul(self.weights, inputs) + self.bias
 
         # gate 1: control the input in, all or zero
         self.g += torch.mul(self.gate_value[0], weighted_inputs)
-
-        # gate 2: control the accumulation(g), drop or keep
-        self.g = torch.mul(self.gate_value[1], self.g)
 
         a = self.activation_functions(self.g, threshold=self.a_threshold, value=self.a_value)
 
         self.update(a)
 
+        # gate 2: control the accumulation(g), drop or keep
+        self.g = torch.mul(self.gate_value[1], self.g)
+
         return a
 
     def update(self, a):
         # different gate values corresponding to different neuron phases
-        rest = torch.tensor([1, 1])
+        rest = torch.tensor([1, 0])
         active = torch.tensor([0, 1])
         refractory = torch.tensor([0, 0])
 
-        # different neuron phase condition
-        active_condition = a > 0 and self.timer_a < self.t_a
-        refractory_condition = self.timer_a >= self.t_a and self.timer_rf < self.t_rf
         rest_condition = self.timer_rf >= self.t_rf
-        reset_condition = self.timer_rf == self.t_rf
+
+        if rest_condition:
+            self.gate_value = rest
+            self.timer_a = 0
+            self.timer_rs += 1
+            self.state.append("rest")
+
+        refractory_condition = self.timer_a >= self.t_a and self.timer_rf < self.t_rf
+
+        if refractory_condition:
+            self.gate_value = refractory
+            self.timer_rf += 1
+            self.state.append("refractory")
+
+        active_condition = a > 0 and self.timer_a < self.t_a
 
         if active_condition:
             self.gate_value = active
             self.timer_a += 1
             self.timer_rf = 0
             self.timer_rs = 0
-        if refractory_condition:
-            self.gate_value = refractory
-            self.timer_rf += 1
-        if rest_condition:
-            self.gate_value = rest
-            self.timer_a = 0
-            self.timer_rs += 1
+            self.state.append("active")
 
         self.age += 1
 
-        if reset_condition:
-            self.age = 0
+        reset_condition = self.timer_rs == 1
 
+        if reset_condition:
+            self.age = 1
+
+        self.age_list.append(self.age)
 
 # Define the one-hot encoding function
 def one_hot_encode(y, num_classes):
