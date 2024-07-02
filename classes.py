@@ -90,7 +90,7 @@ class Neuron:
         active = torch.tensor([0, 1])
         refractory = torch.tensor([0, 0])
 
-        rest_condition = self.timer_rf >= self.t_rf
+        rest_condition = a <= 0 and self.timer_rf >= self.t_rf
 
         if rest_condition:
             self.gate_value = rest
