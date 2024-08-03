@@ -414,5 +414,3 @@ activation_derivatives = {
     'tanh': mf.tanh_derivative,
     'softmax': mf.softmax_cross_entropy_derivative
 }
-
-drawLoop()
