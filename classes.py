@@ -50,20 +50,23 @@ class Dataset:
 
 
 class Neuron:
-    def __init__(self, num_inputs: int, t_a, t_rf, bias):
-        self.weights = torch.rand(num_inputs)
+    def __init__(self, num_inputs: int, t_a, t_rf, bias, weight_type="all one"):
+        if weight_type == "all one":
+            self.weights = torch.ones(num_inputs)
+        else:
+            self.weights = torch.rand(num_inputs)
         self.bias = torch.tensor([bias])
         self.activation_functions = activation_functions['step']
         self.gate_value = torch.tensor([1, 1, 0])
         self.a_threshold = torch.tensor([1])
-        self.a_value = torch.tensor([1])
+        self.a_value = self.a_threshold.data
         self.g = 0
         self.output = torch.tensor([0])
         self.output_record = [torch.tensor(0)]
 
         # t
-        self.t_a = 4
-        self.t_rf = 2
+        self.t_a = t_a
+        self.t_rf = t_rf
 
         # timers
         self.timer_a = 0
@@ -147,18 +150,21 @@ class Neuron:
     def get_state(self):
         return self.state
 
+    def get_weight(self):
+        return round(self.weights.item(), 3)
+
 
 class Loop:
-    def __init__(self, t_a, t_rf, bias, number):
+    def __init__(self, t_a, t_rf, bias, number, weight_type):
         self.neuron_num = number
-        self.neurons = [Neuron(1, t_a, t_rf, bias) for _ in range(self.neuron_num)]
+        self.neurons = [Neuron(1, t_a, t_rf, bias, weight_type) for _ in range(self.neuron_num)]
         self.outputs = [[torch.tensor([0]) for _ in range(self.neuron_num)]]
         self.states = [['rest' for _ in range(self.neuron_num)]]
 
-    def forward(self, external_input: torch.Tensor, input_type, time_steps):
+    def forward(self, external_input: torch.Tensor, input_duration, input_type, time_steps, period=1):
         for t in range(time_steps):
             # spike input
-            if input_type == 'one_time' and t == 0:
+            if input_type == 'one_time' and t < input_duration:
                 ex_signal = external_input
 
             # constant input
@@ -166,7 +172,7 @@ class Loop:
                 ex_signal = external_input
 
             # periodic input
-            elif input_type == 'periodic' and t % external_input == 0:
+            elif input_type == 'periodic' and t % period < input_duration:
                 ex_signal = external_input
 
             else:
@@ -187,97 +193,73 @@ class Loop:
 
         return self.states, self.outputs
 
+    def get_weights(self):
+        return [neuron.get_weight() for neuron in self.neurons]
+
 
 class CircleDiagram:
     def __init__(self, root):
         self.root = root
         self.running = False
+        self.auto_step_id = None
+        self.neuron_number = 6
+        self.time_steps = 1000
 
         # All labels and entries using grid layout
-        self.time_steps_label = Label(root, text="Time Steps:")
-        self.time_steps_label.grid(row=0, column=0, sticky=tk.W)
-        self.time_steps_entry = Entry(root)
-        self.time_steps_entry.grid(row=0, column=1)
-        self.time_steps_entry.insert(0, "50")
-        self.time_steps_entry.bind("<KeyRelease>", self.pause_on_entry_change)
-
         self.input_type_label = Label(root, text="Input Type:")
-        self.input_type_label.grid(row=1, column=0, sticky=tk.W)
+        self.input_type_label.grid(row=0, column=0, sticky=tk.W)
         self.input_type_var = StringVar(value="constant")
-        self.one_time_radio = Radiobutton(root, text="One  Time", variable=self.input_type_var, value="one_time",
+        self.one_time_radio = Radiobutton(root, text="OneTime", variable=self.input_type_var, value="one_time",
                                           command=self.pause_on_entry_change)
-        self.one_time_radio.grid(row=1, column=1, sticky=tk.W)
+        self.one_time_radio.grid(row=0, column=1, sticky=tk.W)
         self.constant_radio = Radiobutton(root, text="Constant", variable=self.input_type_var, value="constant",
                                           command=self.pause_on_entry_change)
-        self.constant_radio.grid(row=1, column=2, sticky=tk.W)
+        self.constant_radio.grid(row=0, column=2, sticky=tk.W)
         self.periodic_radio = Radiobutton(root, text="Periodic", variable=self.input_type_var, value="periodic",
                                           command=self.pause_on_entry_change)
-        self.periodic_radio.grid(row=1, column=3, sticky=tk.W)
+        self.periodic_radio.grid(row=0, column=3, sticky=tk.W)
 
-        self.external_input_label = Label(root, text="External Input:")
-        self.external_input_label.grid(row=2, column=0, sticky=tk.W)
-        self.external_input_entry = Entry(root)
-        self.external_input_entry.grid(row=2, column=1)
-        self.external_input_entry.insert(0, "10")
-        self.external_input_entry.bind("<KeyRelease>", self.pause_on_entry_change)
-
-        self.t_a_label = Label(root, text="τa:")
-        self.t_a_label.grid(row=3, column=0, sticky=tk.W)
-        self.t_a_entry = Entry(root)
-        self.t_a_entry.grid(row=3, column=1)
-        self.t_a_entry.insert(0, "4")
-        self.t_a_entry.bind("<KeyRelease>", self.pause_on_entry_change)
-
-        self.t_r_label = Label(root, text="τrf:")
-        self.t_r_label.grid(row=4, column=0, sticky=tk.W)
-        self.t_r_entry = Entry(root)
-        self.t_r_entry.grid(row=4, column=1)
-        self.t_r_entry.insert(0, "2")
-        self.t_r_entry.bind("<KeyRelease>", self.pause_on_entry_change)
-
-        self.b_label = Label(root, text="bias:")
-        self.b_label.grid(row=5, column=0, sticky=tk.W)
-        self.b_entry = Entry(root)
-        self.b_entry.grid(row=5, column=1)
-        self.b_entry.insert(0, "0.8")
-        self.b_entry.bind("<KeyRelease>", self.pause_on_entry_change)
-
-        self.n_label = Label(root, text="neuron number:")
-        self.n_label.grid(row=6, column=0, sticky=tk.W)
-        self.n_entry = Entry(root)
-        self.n_entry.grid(row=6, column=1)
-        self.n_entry.insert(0, "6")
-        self.n_entry.bind("<KeyRelease>", self.pause_on_entry_change)
-
-        self.s_label = Label(root, text="speed:")
-        self.s_label.grid(row=7, column=0, sticky=tk.W)
-        self.s_entry = Entry(root)
-        self.s_entry.grid(row=7, column=1)
-        self.s_entry.insert(0, "500")
-        self.s_entry.bind("<KeyRelease>", self.pause_on_entry_change)
+        self.input_duration_label, self.input_duration_entry = self.create_input("Input Duration:", 1, 0, "1", "step",
+                                                                                 self.pause_on_entry_change)
+        self.input_period_label, self.input_period_entry = self.create_input("Input Period:", 2, 0, "1", "step",
+                                                                             self.pause_on_entry_change)
+        self.external_input_label, self.external_input_entry = self.create_input("Input Value:", 3, 0, "10", "",
+                                                                                 self.pause_on_entry_change)
+        self.t_a_label, self.t_a_entry = self.create_input("τa:", 4, 0, "4", "step", self.pause_on_entry_change)
+        self.t_r_label, self.t_r_entry = self.create_input("τrf:", 5, 0, "2", "step",self.pause_on_entry_change)
+        self.wt_label, self.wt_entry = self.create_input("Weight Type:", 6, 0, "random", "random or all one",
+                                                         self.pause_on_entry_change)
+        self.b_label, self.b_entry = self.create_input("Bias:", 7, 0, "0.8", "", self.pause_on_entry_change)
+        self.n_label, self.n_entry = self.create_input("Neuron Number:", 8, 0, str(self.neuron_number), "",
+                                                       self.pause_on_entry_change)
+        self.s_label, self.s_entry = self.create_input("Speed:", 9, 0, "500", "ms/step", self.pause_on_entry_change)
 
         self.current_time_step = 0
         self.canvas = Canvas(root, width=400, height=400)
-        self.canvas.grid(row=8, column=0, columnspan=4)
+        self.canvas.grid(row=10, column=0, columnspan=4)
         self.label = Label(root, text=f"Time Step: {self.current_time_step + 1}")
-        self.label.grid(row=9, column=0, columnspan=4)
+        self.label.grid(row=11, column=0, columnspan=4)
         self.stop_button = Button(root, text="Stop", command=self.stop)
-        self.stop_button.grid(row=10, column=0, columnspan=4)
-        self.continue_button = Button(root, text="Continue", command=self.continue_)
-        self.continue_button.grid(row=11, column=0, columnspan=4)
+        self.stop_button.grid(row=12, column=0, columnspan=4)
+        self.go_button = Button(root, text="Go", command=self.go_)
+        self.go_button.grid(row=13, column=0, columnspan=4)
         self.restart_button = Button(root, text="Restart", command=self.restart)
-        self.restart_button.grid(row=12, column=0, columnspan=4)
+        self.restart_button.grid(row=14, column=0, columnspan=4)
+        self.exit_button = Button(root, text="Exit", command=self.exit_program)
+        self.exit_button.grid(row=15, column=0, columnspan=4)
 
-        self.loop = Loop(int(self.t_a_entry.get()), int(self.t_r_entry.get()), float(self.b_entry.get()), int(self.n_entry.get()))
+        self.loop = Loop(int(self.t_a_entry.get()), int(self.t_r_entry.get()), float(self.b_entry.get()),
+                         int(self.n_entry.get()), str(self.wt_entry.get()))
         self.draw_circles()
         self.auto_step()
 
     def draw_circles(self):
         self.canvas.delete("all")
-        time_steps = int(self.time_steps_entry.get())
         input_type = self.input_type_var.get()
+        input_duration = int(self.input_duration_entry.get())
         external_input = int(self.external_input_entry.get())
-        states, outputs = self.loop.forward(torch.tensor([external_input]), input_type, time_steps)
+        time_steps = self.time_steps
+        states, outputs = self.loop.forward(torch.tensor([external_input]), input_duration, input_type, time_steps)
         sts = states[self.current_time_step]
         ops = outputs[self.current_time_step]
         num_circles = len(sts)
@@ -301,8 +283,29 @@ class CircleDiagram:
             y2 = center_y - radius * sin(radians(angle2))
             self.canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=outputsToColors(op))
 
+        for i, op in enumerate(ops):
+            angle = 90 - i * angle_step
+            entry_angle = angle - 180/num_circles
+            x = center_x + 1 * radius * cos(radians(entry_angle))
+            y = center_y - 1 * radius * sin(radians(entry_angle))
+
+            weight_var = self.loop.get_weights()[i]
+            weight_label = Label(self.root, text=weight_var)
+            self.canvas.create_window(x, y, window=weight_label)
+
+    def create_input(self, label_text, row, column, default_value, unit, command):
+        label = Label(self.root, text=label_text)
+        label.grid(row=row, column=column, sticky=tk.W)
+        entry = Entry(self.root)
+        entry.grid(row=row, column=column + 1)
+        entry.insert(0, default_value)
+        entry.bind("<KeyRelease>", command)
+        unit = Label(self.root, text=unit)
+        unit.grid(row=row, column=column + 2, sticky=tk.W)
+        return label, entry
+
     def next_step(self):
-        time_steps = int(self.time_steps_entry.get())
+        time_steps = self.time_steps
         if self.current_time_step < time_steps - 1:
             self.current_time_step += 1
             self.label.config(text=f"Time Step: {self.current_time_step + 1}")
@@ -313,25 +316,32 @@ class CircleDiagram:
     def auto_step(self):
         if self.running:
             self.next_step()
-        self.root.after(int(self.s_entry.get()), self.auto_step)
+        self.auto_step_id = self.root.after(int(self.s_entry.get()), self.auto_step)
 
     def stop(self):
         self.running = False
 
-    def continue_(self):
+    def go_(self):
         self.running = True
 
     def restart(self):
         self.current_time_step = 0
         self.label.config(text=f"Time Step: {self.current_time_step + 1}")
         # Update the loop with new input values
-        time_steps = int(self.time_steps_entry.get())
+        time_steps = self.time_steps
+        input_duration = int(self.input_duration_entry.get())
         input_type = self.input_type_var.get()
         external_input = int(self.external_input_entry.get())
-        self.loop = Loop(int(self.t_a_entry.get()), int(self.t_r_entry.get()), float(self.b_entry.get()), int(self.n_entry.get()))  # Reinitialize the loop
-        self.loop.forward(torch.tensor([external_input]), input_type, time_steps)  # Update loop with new parameters
-        self.running = True
+        self.loop = Loop(int(self.t_a_entry.get()), int(self.t_r_entry.get()), float(self.b_entry.get()),
+                         int(self.n_entry.get()), str(self.wt_entry.get()))  # Reinitialize the loop
+        self.loop.forward(torch.tensor([external_input]), input_duration, input_type, time_steps)
+        self.running = False
         self.draw_circles()
+
+    def exit_program(self):
+        self.root.after_cancel(self.auto_step_id)
+        self.running = False
+        self.root.destroy()
 
     def pause_on_entry_change(self, event=None):
         self.stop()
@@ -396,7 +406,6 @@ def calculateAccuracy(pred_label, true_label):
     return acc / len(pred_label)
 
 
-# 创建一个字典来存储激活函数
 activation_functions = {
     'linear': mf.linear,
     'sigmoid': mf.sigmoid,
@@ -406,7 +415,6 @@ activation_functions = {
     'step': mf.step
 }
 
-# 创建一个字典来存储激活函数的导数
 activation_derivatives = {
     'linear': mf.linear_derivative,
     'sigmoid': mf.sigmoid_derivative,
