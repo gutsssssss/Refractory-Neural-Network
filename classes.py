@@ -392,8 +392,8 @@ def saveModel(model, filename):
         pickle.dump(model, f)
 
 
-# 加载模型参数
-def load_model(filename):
+# load model
+def loadModel(filename):
     with open(filename, 'rb') as f:
         return pickle.load(f)
 
