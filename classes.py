@@ -184,7 +184,9 @@ class Loop:
         self.weights = []
         self.g = [[torch.tensor([0]) for _ in range(self.neuron_num)]]
 
-    def forward(self, external_input: torch.Tensor, input_duration, input_type, time_steps, period=1):
+    def forward(self, external_input, input_duration, input_type, time_steps, period=1):
+        external_input = external_input.split(',')
+        external_input = [float(a) for a in external_input]
         for t in range(time_steps):
             # spike input
             if input_type == 'one_time' and t < input_duration:
@@ -199,10 +201,9 @@ class Loop:
                 ex_signal = external_input
 
             else:
-                ex_signal = torch.tensor([0])
+                ex_signal = torch.zeros(self.neuron_num)
 
-            input_signal = [self.neurons[i - 1].get_output() for i in range(self.neuron_num)]
-            input_signal[0] = input_signal[0].float() + ex_signal
+            input_signal = [self.neurons[i - 1].get_output() + ex_signal[i] for i in range(self.neuron_num)]
 
             # update neurons
             [self.neurons[i].forward(input_signal[i]) for i in range(self.neuron_num)]
@@ -257,7 +258,7 @@ class CircleDiagram:
         self.create_radio_button("Periodic", self.input_type_var, "periodic", 3, self.input_column)
         self.input_duration_label, self.input_duration_entry = self.create_input("Input Duration:", 4, self.input_column, "1")
         self.input_period_label, self.input_period_entry = self.create_input("Input Period:", 5, self.input_column, "1")
-        self.external_input_label, self.external_input_entry = self.create_input("Input Value:", 6, self.input_column, "1")
+        self.external_input_label, self.external_input_entry = self.create_input("Input Value:", 6, self.input_column, "1,1,1,1,1,1")
 
         # Visualization Setting
         self.visualization_column = 5
@@ -288,9 +289,9 @@ class CircleDiagram:
         self.canvas.delete("all")
         input_type = self.input_type_var.get()
         input_duration = int(self.input_duration_entry.get())
-        external_input = float(self.external_input_entry.get())
+        external_input = str(self.external_input_entry.get())
         time_steps = self.time_steps
-        states, outputs, weights, g = self.loop.forward(torch.tensor([external_input]), input_duration, input_type,
+        states, outputs, weights, g = self.loop.forward(external_input, input_duration, input_type,
                                                         time_steps)
         sts = states[self.current_time_step]
         ops = outputs[self.current_time_step]
@@ -406,12 +407,12 @@ class CircleDiagram:
         time_steps = self.time_steps
         input_duration = int(self.input_duration_entry.get())
         input_type = self.input_type_var.get()
-        external_input = float(self.external_input_entry.get())
+        external_input = str(self.external_input_entry.get())
         self.neuron_number = int(self.n_entry.get())  # 更新神经元数量
         self.loop = Loop(str(self.t_entry.get()), float(self.b_entry.get()), int(self.n_entry.get()),
                          str(self.weight_type_var.get()), float(self.w_entry.get()), str(self.wv_entry.get()),
                          str(self.wb_entry.get()), float(self.f_entry.get()))
-        self.loop.forward(torch.tensor([external_input]), input_duration, input_type, time_steps)
+        self.loop.forward(external_input, input_duration, input_type, time_steps)
         self.running = False
         self.state_history = [[] for _ in range(self.neuron_number)]
         self.time_steps_history = [[] for _ in range(self.neuron_number)]
