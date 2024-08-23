@@ -258,7 +258,7 @@ class CircleDiagram:
         self.create_radio_button("Periodic", self.input_type_var, "periodic", 3, self.input_column)
         self.input_duration_label, self.input_duration_entry = self.create_input("Input Duration:", 4, self.input_column, "1")
         self.input_period_label, self.input_period_entry = self.create_input("Input Period:", 5, self.input_column, "1")
-        self.external_input_label, self.external_input_entry = self.create_input("Input Value:", 6, self.input_column, "1,1,1,1,1,1")
+        self.external_input_label, self.external_input_entry = self.create_input("Input Value:", 6, self.input_column, "1,0,0,0,0,0")
 
         # Visualization Setting
         self.visualization_column = 5
@@ -302,12 +302,13 @@ class CircleDiagram:
         radius = 150
         center_x, center_y = 200, 200
 
+        # drawing
         for i, st in enumerate(sts):
             angle = 90 - i * angle_step
             x = center_x + radius * cos(radians(angle))
             y = center_y - radius * sin(radians(angle))
             self.canvas.create_oval(x - 20, y - 20, x + 20, y + 20, fill=statesToColors(st))
-            self.canvas.create_text(x, y - 30, text=st)
+            # self.canvas.create_text(x, y - 30, text=st)
             self.state_history[i].append(st)
             self.time_steps_history[i].append(self.current_time_step)
             if len(self.state_history[i]) > 10:
@@ -365,8 +366,8 @@ class CircleDiagram:
 
     def draw_state_history(self):
         self.right_canvas.delete("all")
-        circle_radius = 20  # 增大圆的半径
-        spacing = 30  # 增大圆之间的间距
+        circle_radius = 10
+        spacing = 15
 
         for i, history in enumerate(self.state_history):
             for j, state in enumerate(history):
@@ -374,11 +375,10 @@ class CircleDiagram:
                 y = i * (circle_radius * 2 + spacing) + circle_radius + spacing + 50
                 self.right_canvas.create_oval(x - circle_radius, y - circle_radius, x + circle_radius,
                                               y + circle_radius, fill=statesToColors(state))
-                self.right_canvas.create_text(x, y, text=state, font=("Arial", 8))
 
         for j in range(len(self.time_steps_history[0])):
             x = j * (circle_radius * 2 + spacing) + circle_radius + spacing
-            self.right_canvas.create_text(x, 20, text=f"Step {self.time_steps_history[0][j]}", font=("Arial", 10))
+            self.right_canvas.create_text(x, 20, text=f"Step {self.time_steps_history[0][j]}", font=("Arial", 8))
 
     def next_step(self):
         time_steps = self.time_steps
