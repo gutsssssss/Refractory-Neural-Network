@@ -50,19 +50,15 @@ class Dataset:
 
 
 class Neuron:
-    def __init__(self, num_inputs: int, t, bias, weight_type, weight_value, weight_boundary, forgetting_rate):
-        wv = weight_value.split(',')
-        wv = [float(w) for w in wv]
+    def __init__(self, num_inputs: int, t, bias, weight_type, w, weight_boundary, forgetting_rate):
         t = t.split(',')
         t = [int(a) for a in t]
         wb = weight_boundary.split(',')
         wb = [float(b) for b in wb]
-        if weight_type == "all the same":
-            self.weights = [torch.tensor(wv[0]) for _ in range(num_inputs)]
         if weight_type == "random":
-            self.weights = torch.tensor([wb[0]]) + torch.mul(torch.rand(num_inputs), wb[1] - wb[0])
+            self.weights = torch.tensor(wb[0]) + torch.mul(torch.rand(num_inputs), wb[1] - wb[0])
         else:
-            self.weights = torch.tensor(wv)
+            self.weights = torch.tensor([w for _ in range(num_inputs)])
 
         self.bias = torch.tensor([bias])
         self.forgetting_rate = forgetting_rate
@@ -173,11 +169,16 @@ class Neuron:
 
 
 class Loop:
-    def __init__(self, t, bias, number, weight_type, weight_value, weight_boundary, forgetting_rate):
+    def __init__(self, t, bias, number, weight_type, w, weight_list, weight_boundary, forgetting_rate):
         self.neuron_num = number
-        self.neurons = [
-            Neuron(1, t, bias, weight_type, weight_value, weight_boundary, forgetting_rate) for _ in
-            range(self.neuron_num)]
+        wl = weight_list.split(',')
+        wl = [float(a) for a in wl]
+        if weight_type == "custom":
+            self.neurons = [
+                Neuron(1, t, bias, weight_type, wl[i], weight_boundary, forgetting_rate) for i in range(self.neuron_num)]
+        else:
+            self.neurons = [
+                Neuron(1, t, bias, weight_type, w, weight_boundary, forgetting_rate) for _ in range(self.neuron_num)]
         self.outputs = [[torch.tensor([0]) for _ in range(self.neuron_num)]]
         self.states = [['rest' for _ in range(self.neuron_num)]]
         self.weights = []
@@ -235,16 +236,17 @@ class CircleDiagram:
         # Initial Neuron Setting
         self.neuron_column = 0
         self.create_label("Weight Type:", 0, self.neuron_column)
-        self.weight_type_var = StringVar(value="random")
+        self.weight_type_var = StringVar(value="custom")
         self.create_radio_button("Random", self.weight_type_var, "random", 1, self.neuron_column)
         self.create_radio_button("All the same", self.weight_type_var, "all the same", 2, self.neuron_column)
         self.create_radio_button("Custom", self.weight_type_var, "custom", 3, self.neuron_column)
-        self.wv_label, self.wv_entry = self.create_input("Weight Value:", 4, self.neuron_column, "0.6,0.8,0.7")
-        self.wb_label, self.wb_entry = self.create_input("Weight Boundary:", 5, self.neuron_column, "0.5,0.8")
-        self.b_label, self.b_entry = self.create_input("Bias:", 6, self.neuron_column, "0.8")
-        self.t_label, self.t_entry = self.create_input("τa, τrf:", 7, self.neuron_column, "4,2")
-        self.f_label, self.f_entry = self.create_input("Forgetting Rate:", 8, self.neuron_column, "0.3")
-        self.n_label, self.n_entry = self.create_input("Neuron Number:", 9, self.neuron_column, str(self.neuron_number))
+        self.wb_label, self.wb_entry = self.create_input("boundary:", 1, self.neuron_column, "0.5,0.8", sticky=tk.E)
+        self.w_label, self.w_entry = self.create_input("value:", 2, self.neuron_column, "0.6", sticky=tk.E)
+        self.wv_label, self.wv_entry = self.create_input("value list:", 3, self.neuron_column, "0.6,0.8,0.7,0.5,0.6,0.9", sticky=tk.E)
+        self.b_label, self.b_entry = self.create_input("Bias:", 4, self.neuron_column, "0.8")
+        self.t_label, self.t_entry = self.create_input("τa, τrf:", 5, self.neuron_column, "4,2")
+        self.f_label, self.f_entry = self.create_input("Forgetting Rate:", 6, self.neuron_column, "0.3")
+        self.n_label, self.n_entry = self.create_input("Neuron Number:", 7, self.neuron_column, str(self.neuron_number))
 
         # Input Setting
         self.input_column = 3
@@ -269,15 +271,15 @@ class CircleDiagram:
 
         # Canvas for drawing
         self.canvas = Canvas(root, width=400, height=400)
-        self.canvas.grid(row=7, column=0, columnspan=2)
+        self.canvas.grid(row=8, column=0, columnspan=2)
         self.right_canvas = Canvas(root, width=750, height=750)
-        self.right_canvas.grid(row=7, column=4, columnspan=2, padx=10, pady=10)
+        self.right_canvas.grid(row=8, column=4, columnspan=2, padx=10, pady=10)
 
         self.state_history = [[] for _ in range(self.neuron_number)]
         self.time_steps_history = [[] for _ in range(self.neuron_number)]
 
-        self.loop = Loop(str(self.t_entry.get()), float(self.b_entry.get()),
-                         int(self.n_entry.get()), str(self.weight_type_var.get()), str(self.wv_entry.get()),
+        self.loop = Loop(str(self.t_entry.get()), float(self.b_entry.get()), int(self.n_entry.get()),
+                         str(self.weight_type_var.get()), float(self.w_entry.get()), str(self.wv_entry.get()),
                          str(self.wb_entry.get()), float(self.f_entry.get()))
         self.draw_circles()
         self.auto_step()
@@ -347,9 +349,9 @@ class CircleDiagram:
         radio_button = Radiobutton(self.root, text=text, variable=variable, value=value, command=self.pause_on_entry_change)
         radio_button.grid(row=row, column=column, sticky=tk.W)
 
-    def create_input(self, label_text, row, column, default_value):
+    def create_input(self, label_text, row, column, default_value, sticky=tk.W):
         label = Label(self.root, text=label_text)
-        label.grid(row=row, column=column, sticky=tk.W)
+        label.grid(row=row, column=column, sticky=sticky)
         entry = Entry(self.root)
         entry.grid(row=row, column=column + 1)
         entry.insert(0, default_value)
@@ -406,8 +408,9 @@ class CircleDiagram:
         input_type = self.input_type_var.get()
         external_input = float(self.external_input_entry.get())
         self.neuron_number = int(self.n_entry.get())  # 更新神经元数量
-        self.loop = Loop(int(self.t_a_entry.get()), int(self.t_r_entry.get()), float(self.b_entry.get()),
-                         self.neuron_number, str(self.wt_entry.get()), float(self.f_entry.get()))
+        self.loop = Loop(str(self.t_entry.get()), float(self.b_entry.get()), int(self.n_entry.get()),
+                         str(self.weight_type_var.get()), float(self.w_entry.get()), str(self.wv_entry.get()),
+                         str(self.wb_entry.get()), float(self.f_entry.get()))
         self.loop.forward(torch.tensor([external_input]), input_duration, input_type, time_steps)
         self.running = False
         self.state_history = [[] for _ in range(self.neuron_number)]
