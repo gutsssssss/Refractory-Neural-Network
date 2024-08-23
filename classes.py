@@ -50,11 +50,20 @@ class Dataset:
 
 
 class Neuron:
-    def __init__(self, num_inputs: int, t_a, t_rf, bias, weight_type, forgetting_rate):
-        if weight_type == "all one":
-            self.weights = torch.ones(num_inputs)
+    def __init__(self, num_inputs: int, t, bias, weight_type, weight_value, weight_boundary, forgetting_rate):
+        wv = weight_value.split(',')
+        wv = [float(w) for w in wv]
+        t = t.split(',')
+        t = [int(a) for a in t]
+        wb = weight_boundary.split(',')
+        wb = [float(b) for b in wb]
+        if weight_type == "all the same":
+            self.weights = [torch.tensor(wv[0]) for _ in range(num_inputs)]
+        if weight_type == "random":
+            self.weights = torch.tensor([wb[0]]) + torch.mul(torch.rand(num_inputs), wb[1] - wb[0])
         else:
-            self.weights = torch.rand(num_inputs)
+            self.weights = torch.tensor(wv)
+
         self.bias = torch.tensor([bias])
         self.forgetting_rate = forgetting_rate
         self.activation_functions = activation_functions['step']
@@ -67,8 +76,8 @@ class Neuron:
         self.output_record = [torch.tensor(0)]
 
         # t
-        self.t_a = t_a
-        self.t_rf = t_rf
+        self.t_a = t[0]
+        self.t_rf = t[1]
 
         # timers
         self.timer_a = 0
@@ -164,9 +173,11 @@ class Neuron:
 
 
 class Loop:
-    def __init__(self, t_a, t_rf, bias, number, weight_type, forgetting_rate):
+    def __init__(self, t, bias, number, weight_type, weight_value, weight_boundary, forgetting_rate):
         self.neuron_num = number
-        self.neurons = [Neuron(1, t_a, t_rf, bias, weight_type, forgetting_rate) for _ in range(self.neuron_num)]
+        self.neurons = [
+            Neuron(1, t, bias, weight_type, weight_value, weight_boundary, forgetting_rate) for _ in
+            range(self.neuron_num)]
         self.outputs = [[torch.tensor([0]) for _ in range(self.neuron_num)]]
         self.states = [['rest' for _ in range(self.neuron_num)]]
         self.weights = []
@@ -219,60 +230,55 @@ class CircleDiagram:
         self.auto_step_id = None
         self.neuron_number = 6
         self.time_steps = 1000
-
-        # All labels and entries using grid layout
-        self.input_type_label = Label(root, text="Input Type:")
-        self.input_type_label.grid(row=0, column=0, sticky=tk.W)
-        self.input_type_var = StringVar(value="constant")
-        self.one_time_radio = Radiobutton(root, text="OneTime", variable=self.input_type_var, value="one_time",
-                                          command=self.pause_on_entry_change)
-        self.one_time_radio.grid(row=0, column=1, sticky=tk.W)
-        self.constant_radio = Radiobutton(root, text="Constant", variable=self.input_type_var, value="constant",
-                                          command=self.pause_on_entry_change)
-        self.constant_radio.grid(row=0, column=2, sticky=tk.W)
-        self.periodic_radio = Radiobutton(root, text="Periodic", variable=self.input_type_var, value="periodic",
-                                          command=self.pause_on_entry_change)
-        self.periodic_radio.grid(row=0, column=3, sticky=tk.W)
-
-        self.input_duration_label, self.input_duration_entry = self.create_input("Input Duration:", 1, 0, "1", "step",
-                                                                                 self.pause_on_entry_change)
-        self.input_period_label, self.input_period_entry = self.create_input("Input Period:", 2, 0, "1", "step",
-                                                                             self.pause_on_entry_change)
-        self.external_input_label, self.external_input_entry = self.create_input("Input Value:", 3, 0, "1", "",
-                                                                                 self.pause_on_entry_change)
-        self.t_a_label, self.t_a_entry = self.create_input("τa:", 4, 0, "4", "step", self.pause_on_entry_change)
-        self.t_r_label, self.t_r_entry = self.create_input("τrf:", 5, 0, "2", "step",self.pause_on_entry_change)
-        self.wt_label, self.wt_entry = self.create_input("Weight Type:", 6, 0, "random", "random or all one",
-                                                         self.pause_on_entry_change)
-        self.b_label, self.b_entry = self.create_input("Bias:", 7, 0, "0.8", "", self.pause_on_entry_change)
-        self.f_label, self.f_entry = self.create_input("Forgetting Rate:", 8, 0, "0.3", "", self.pause_on_entry_change)
-        self.n_label, self.n_entry = self.create_input("Neuron Number:", 9, 0, str(self.neuron_number), "",
-                                                       self.pause_on_entry_change)
-        self.s_label, self.s_entry = self.create_input("Speed:", 10, 0, "500", "ms/step", self.pause_on_entry_change)
-
         self.current_time_step = 0
-        self.canvas = Canvas(root, width=400, height=400)
-        self.canvas.grid(row=11, column=0, columnspan=4)
-        self.label = Label(root, text=f"Time Step: {self.current_time_step + 1}")
-        self.label.grid(row=12, column=0, columnspan=4)
-        self.stop_button = Button(root, text="Stop", command=self.stop)
-        self.stop_button.grid(row=13, column=0, columnspan=4)
-        self.go_button = Button(root, text="Go", command=self.go_)
-        self.go_button.grid(row=14, column=0, columnspan=4)
-        self.restart_button = Button(root, text="Restart", command=self.restart)
-        self.restart_button.grid(row=15, column=0, columnspan=4)
-        self.exit_button = Button(root, text="Exit", command=self.exit_program)
-        self.exit_button.grid(row=16, column=0, columnspan=4)
 
-        # New canvas on the right
+        # Initial Neuron Setting
+        self.neuron_column = 0
+        self.create_label("Weight Type:", 0, self.neuron_column)
+        self.weight_type_var = StringVar(value="random")
+        self.create_radio_button("Random", self.weight_type_var, "random", 1, self.neuron_column)
+        self.create_radio_button("All the same", self.weight_type_var, "all the same", 2, self.neuron_column)
+        self.create_radio_button("Custom", self.weight_type_var, "custom", 3, self.neuron_column)
+        self.wv_label, self.wv_entry = self.create_input("Weight Value:", 4, self.neuron_column, "0.6,0.8,0.7")
+        self.wb_label, self.wb_entry = self.create_input("Weight Boundary:", 5, self.neuron_column, "0.5,0.8")
+        self.b_label, self.b_entry = self.create_input("Bias:", 6, self.neuron_column, "0.8")
+        self.t_label, self.t_entry = self.create_input("τa, τrf:", 7, self.neuron_column, "4,2")
+        self.f_label, self.f_entry = self.create_input("Forgetting Rate:", 8, self.neuron_column, "0.3")
+        self.n_label, self.n_entry = self.create_input("Neuron Number:", 9, self.neuron_column, str(self.neuron_number))
+
+        # Input Setting
+        self.input_column = 3
+        self.create_label("Input Type:", 0, self.input_column)
+        self.input_type_var = StringVar(value="constant")
+        self.create_radio_button("OneTime", self.input_type_var, "one_time", 1, self.input_column)
+        self.create_radio_button("Constant", self.input_type_var, "constant", 2, self.input_column)
+        self.create_radio_button("Periodic", self.input_type_var, "periodic", 3, self.input_column)
+        self.input_duration_label, self.input_duration_entry = self.create_input("Input Duration:", 4, self.input_column, "1")
+        self.input_period_label, self.input_period_entry = self.create_input("Input Period:", 5, self.input_column, "1")
+        self.external_input_label, self.external_input_entry = self.create_input("Input Value:", 6, self.input_column, "1")
+
+        # Visualization Setting
+        self.visualization_column = 5
+        self.s_label, self.s_entry = self.create_input("Playback Speed:", 0, self.visualization_column, "500")
+        self.label = Label(root, text=f"Time Step: {self.current_time_step + 1}")
+        self.label.grid(row=1, column=self.visualization_column, columnspan=4, sticky=tk.W)
+        self.create_button("Stop", self.stop, 2, self.visualization_column)
+        self.create_button("Go", self.go_, 3, self.visualization_column)
+        self.create_button("Restart", self.restart, 4, self.visualization_column)
+        self.create_button("Exit", self.exit_program, 5, self.visualization_column)
+
+        # Canvas for drawing
+        self.canvas = Canvas(root, width=400, height=400)
+        self.canvas.grid(row=7, column=0, columnspan=2)
         self.right_canvas = Canvas(root, width=750, height=750)
-        self.right_canvas.grid(row=0, column=4, rowspan=17, padx=10, pady=10)
+        self.right_canvas.grid(row=7, column=4, columnspan=2, padx=10, pady=10)
 
         self.state_history = [[] for _ in range(self.neuron_number)]
         self.time_steps_history = [[] for _ in range(self.neuron_number)]
 
-        self.loop = Loop(int(self.t_a_entry.get()), int(self.t_r_entry.get()), float(self.b_entry.get()),
-                         int(self.n_entry.get()), str(self.wt_entry.get()), float(self.f_entry.get()))
+        self.loop = Loop(str(self.t_entry.get()), float(self.b_entry.get()),
+                         int(self.n_entry.get()), str(self.weight_type_var.get()), str(self.wv_entry.get()),
+                         str(self.wb_entry.get()), float(self.f_entry.get()))
         self.draw_circles()
         self.auto_step()
 
@@ -307,6 +313,15 @@ class CircleDiagram:
 
         self.draw_state_history()
 
+        for i, wt in enumerate(wts):
+            angle = 90 - i * angle_step
+            entry_angle = angle + 180 / num_circles
+            x_w = center_x + 1 * radius * cos(radians(entry_angle))
+            y_w = center_y - 1 * radius * sin(radians(entry_angle))
+
+            weight_label = Label(self.root, text=round(wt.item(), 3))
+            self.canvas.create_window(x_w, y_w, window=weight_label)
+
         for i, op in enumerate(ops):
             angle1 = 90 - i * angle_step
             angle2 = 90 - (i + 1) % num_circles * angle_step
@@ -316,15 +331,6 @@ class CircleDiagram:
             y2 = center_y - radius * sin(radians(angle2))
             self.canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=outputsToColors(op))
 
-        for i, wt in enumerate(wts):
-            angle = 90 - i * angle_step
-            entry_angle = angle + 180/num_circles
-            x_w = center_x + 1 * radius * cos(radians(entry_angle))
-            y_w = center_y - 1 * radius * sin(radians(entry_angle))
-
-            weight_label = Label(self.root, text=round(wt.item(), 3))
-            self.canvas.create_window(x_w, y_w, window=weight_label)
-
         for i, g in enumerate(gs):
             angle = 90 - i * angle_step
             x_g = center_x + 0.62 * radius * cos(radians(angle))
@@ -333,16 +339,26 @@ class CircleDiagram:
             g_label = Label(self.root, text=round(g.item(), 3))
             self.canvas.create_window(x_g, y_g, window=g_label)
 
-    def create_input(self, label_text, row, column, default_value, unit, command):
+    def create_label(self, text, row, column):
+        label = Label(self.root, text=text)
+        label.grid(row=row, column=column, sticky=tk.W)
+
+    def create_radio_button(self, text, variable, value, row, column):
+        radio_button = Radiobutton(self.root, text=text, variable=variable, value=value, command=self.pause_on_entry_change)
+        radio_button.grid(row=row, column=column, sticky=tk.W)
+
+    def create_input(self, label_text, row, column, default_value):
         label = Label(self.root, text=label_text)
         label.grid(row=row, column=column, sticky=tk.W)
         entry = Entry(self.root)
         entry.grid(row=row, column=column + 1)
         entry.insert(0, default_value)
-        entry.bind("<KeyRelease>", command)
-        unit = Label(self.root, text=unit)
-        unit.grid(row=row, column=column + 2, sticky=tk.W)
+        entry.bind("<KeyRelease>", self.pause_on_entry_change)
         return label, entry
+
+    def create_button(self, text, command, row, column):
+        button = Button(self.root, text=text, command=command)
+        button.grid(row=row, column=column, sticky=tk.W)
 
     def draw_state_history(self):
         self.right_canvas.delete("all")
@@ -353,7 +369,8 @@ class CircleDiagram:
             for j, state in enumerate(history):
                 x = j * (circle_radius * 2 + spacing) + circle_radius + spacing
                 y = i * (circle_radius * 2 + spacing) + circle_radius + spacing + 50
-                self.right_canvas.create_oval(x - circle_radius, y - circle_radius, x + circle_radius, y + circle_radius, fill=statesToColors(state))
+                self.right_canvas.create_oval(x - circle_radius, y - circle_radius, x + circle_radius,
+                                              y + circle_radius, fill=statesToColors(state))
                 self.right_canvas.create_text(x, y, text=state, font=("Arial", 8))
 
         for j in range(len(self.time_steps_history[0])):
