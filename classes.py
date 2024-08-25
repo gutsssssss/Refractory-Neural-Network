@@ -11,14 +11,15 @@ from torch.utils.data import TensorDataset
 from torch.utils.data import DataLoader
 import matplotlib
 import tkinter as tk
+from tkinter import ttk # ttk is used for more modern widgets
 from tkinter import Canvas, Button, Label, Entry, Radiobutton, StringVar
 from math import cos, sin, radians
 
+
 matplotlib.use('TkAgg')
-
-
 class Dataset:
     def __init__(self, address):
+        
         # define the size and classes number
         self.img_height = arg.img_height
         self.img_width = arg.img_width
@@ -88,7 +89,7 @@ class Neuron:
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         # Convert inputs to Float
-        inputs = inputs.float()
+        inputs = inputs.float().unsqueeze(0)
 
         # calculate weighted inputs
         weighted_inputs = torch.matmul(self.weights, inputs)
@@ -238,11 +239,14 @@ def state_to_number(st):
 class CircleDiagram:
     def __init__(self, root):
         self.root = root
+        self.screen_ratio = 0.7
         self.running = False
         self.auto_step_id = None
         self.neuron_number = 6
         self.time_steps = 1000
         self.current_time_step = 0
+
+        
 
         # Initial Neuron Setting
         self.neuron_column = 0
@@ -251,13 +255,16 @@ class CircleDiagram:
         self.create_radio_button("Random", self.weight_type_var, "random", 1, self.neuron_column)
         self.create_radio_button("All the same", self.weight_type_var, "all the same", 2, self.neuron_column)
         self.create_radio_button("Custom", self.weight_type_var, "custom", 3, self.neuron_column)
-        self.wb_label, self.wb_entry = self.create_input("boundary:", 1, self.neuron_column, "0.5,0.8", sticky=tk.E)
-        self.w_label, self.w_entry = self.create_input("value:", 2, self.neuron_column, "0.6", sticky=tk.E)
-        self.wv_label, self.wv_entry = self.create_input("value list:", 3, self.neuron_column, "0.4,0.6,0.7,0.5,0.6,0.9", sticky=tk.E)
-        self.b_label, self.b_entry = self.create_input("Bias:", 4, self.neuron_column, "0.2")
-        self.t_label, self.t_entry = self.create_input("τa, τrf:", 5, self.neuron_column, "4,2")
-        self.f_label, self.f_entry = self.create_input("Forgetting Rate:", 6, self.neuron_column, "0.3")
-        self.n_label, self.n_entry = self.create_input("Neuron Number:", 7, self.neuron_column, str(self.neuron_number))
+
+        self.setting_column = 1
+        self.create_label("Neuron Setting:", 0, self.setting_column)
+        self.wb_label, self.wb_entry = self.create_input("boundary:", 1, self.setting_column, "0.5,0.8")
+        self.w_label, self.w_entry = self.create_input("value:", 2, self.setting_column, "0.6")
+        self.wv_label, self.wv_entry = self.create_input("value list:", 3, self.setting_column, "0.4,0.6,0.7,0.5,0.6,0.9")
+        self.b_label, self.b_entry = self.create_input("Bias:", 4, self.setting_column, "0.2")
+        self.t_label, self.t_entry = self.create_input("τa, τrf:", 5, self.setting_column, "4,2")
+        self.f_label, self.f_entry = self.create_input("Forgetting Rate:", 6, self.setting_column, "0.3")
+        self.n_label, self.n_entry = self.create_input("Neuron Number:", 7, self.setting_column, str(self.neuron_number))
 
         # Input Setting
         self.input_column = 3
@@ -281,16 +288,30 @@ class CircleDiagram:
         self.create_button("Exit", self.exit_program, 14, self.visualization_column)
 
         # Canvas for drawing loop
-        self.canvas = Canvas(root, width=400, height=400)
+        self.canvas = Canvas(root, width=int(520 * self.screen_ratio), height=int(400 * self.screen_ratio))
         self.canvas.grid(row=8, column=0, columnspan=2)
+
         # Canvas for drawing state history
-        self.right_canvas = Canvas(root, width=400, height=400)
-        self.right_canvas.grid(row=8, column=3, columnspan=2, padx=10, pady=10)
+        # Scrollable right canvas for drawing state history
+        self.right_canvas_frame = tk.Frame(root)
+        self.right_canvas_frame.grid(row=8, column=2, columnspan=2, padx=10, pady=10)
+
+        self.right_canvas = Canvas(self.right_canvas_frame, width=int(500 * self.screen_ratio), height=(430 * self.screen_ratio))
+        self.scrollbar = tk.Scrollbar(self.right_canvas_frame, orient="horizontal", command=self.right_canvas.xview)
+        self.right_canvas.configure(xscrollcommand=self.scrollbar.set)
+
+        self.scrollbar.pack(side="bottom", fill="x")
+        self.right_canvas.pack(side="left", fill="both", expand=True)
+
+
+
+        # self.right_canvas = Canvas(root, width=int(450 * self.screen_ratio), height=(430 * self.screen_ratio))
+        # self.right_canvas.grid(row = 8, column = 2, columnspan=2, padx=10, pady=10 )
         # Canvas for drawing state history scatter plot
         self.scatter_canvases = []
         for i in range(self.neuron_number):
-            canvas = Canvas(root, width=250, height=200)
-            canvas.grid(row=8 + i // 3, column=i % 3 + 5, padx=10, pady=10)
+            canvas = Canvas(root, width=int(250 * self.screen_ratio), height=int(250 * self.screen_ratio))
+            canvas.grid(row=8 + i // 3, column=i % 3 + 4, padx=10, pady=10)
             self.scatter_canvases.append(canvas)
 
         self.state_history = [[] for _ in range(self.neuron_number)]
@@ -300,7 +321,8 @@ class CircleDiagram:
                          str(self.weight_type_var.get()), float(self.w_entry.get()), str(self.wv_entry.get()),
                          str(self.wb_entry.get()), float(self.f_entry.get()))
         self.draw_circles()
-        self.auto_step()
+        self.auto_step() 
+
 
     def draw_circles(self):
         self.canvas.delete("all")
@@ -316,8 +338,9 @@ class CircleDiagram:
         gs = g[self.current_time_step]
         num_circles = len(sts)
         angle_step = 360 / num_circles
-        radius = 150
-        center_x, center_y = 200, 200
+        radius = int(150 * self.screen_ratio)
+        center_x, center_y = int(200 * self.screen_ratio), int(200 * self.screen_ratio)
+    
 
         # drawing
         for i, st in enumerate(sts):
@@ -328,9 +351,9 @@ class CircleDiagram:
             # self.canvas.create_text(x, y - 30, text=st)
             self.state_history[i].append(st)
             self.time_steps_history[i].append(self.current_time_step)
-            if len(self.state_history[i]) > 10:
-                self.state_history[i].pop(0)
-                self.time_steps_history[i].pop(0)
+            # if len(self.state_history[i]) > 10:
+            #     self.state_history[i].pop(0)
+            #     self.time_steps_history[i].pop(0)
 
         self.draw_state_history()
 
@@ -360,6 +383,23 @@ class CircleDiagram:
             g_label = Label(self.root, text=round(g.item(), 3))
             self.canvas.create_window(x_g, y_g, window=g_label)
 
+        # Drawing the state annotations closer to the main diagram
+        annotation_radius = 10  # Radius for the annotation circles
+        annotation_positions = [(center_x + 180, center_y - 100),  # Adjusted positions for no overlap
+                                (center_x + 180, center_y),
+                                (center_x + 180, center_y + 100)]
+        colors = ['red', 'orange', 'yellow']
+        labels = ['active stage', 'refractory stage', 'rest stage']
+
+        for i, (color, label) in enumerate(zip(colors, labels)):
+            x, y = annotation_positions[i]
+            self.canvas.create_oval(x - annotation_radius, y - annotation_radius, 
+                                    x + annotation_radius, y + annotation_radius, 
+                                    fill=color)
+            self.canvas.create_text(x, y + 30, text=label, font=("Arial", 12))
+
+
+
     def create_label(self, text, row, column):
         label = Label(self.root, text=text)
         label.grid(row=row, column=column, sticky=tk.W)
@@ -383,40 +423,44 @@ class CircleDiagram:
         button.grid(row=row, column=column, sticky=sticky)
 
     def draw_state_history(self):
-        self.right_canvas.delete("all")
-        for canvas in self.scatter_canvases:
-            canvas.delete("all")
-        circle_radius = 10
-        spacing = 15
+        # self.right_canvas.delete("all")
+        # for canvas in self.scatter_canvases:
+        #     canvas.delete("all")
+        circle_radius = int(15 * self.screen_ratio)
+        spacing = int(30 * self.screen_ratio)
+        x_offset = 0  # Start from 0 to ensure the first step is visible
+        total_width = len(self.time_steps_history[0]) * (circle_radius * 2 + spacing) + circle_radius + spacing - x_offset
+        self.right_canvas.config(scrollregion=(0, 0, total_width, 500))
 
         for i, history in enumerate(self.state_history):
             for j, state in enumerate(history):
                 x = j * (circle_radius * 2 + spacing) + circle_radius + spacing
-                y = i * (circle_radius * 2 + spacing) + circle_radius + spacing + 50
+                y = i * (circle_radius * 2 + spacing) + circle_radius + spacing + int(50 * self.screen_ratio)
                 self.right_canvas.create_oval(x - circle_radius, y - circle_radius, x + circle_radius,
                                               y + circle_radius, fill=statesToColors(state))
 
         for j in range(len(self.time_steps_history[0])):
             x = j * (circle_radius * 2 + spacing) + circle_radius + spacing
-            self.right_canvas.create_text(x, 20, text=f"Step {self.time_steps_history[0][j]}", font=("Arial", 7))
+            self.right_canvas.create_text(x, 20, text=f"{self.time_steps_history[0][j]}", font=("Arial",12))
+
 
         # 绘制每个神经元的折线图
         for i, history in enumerate(self.state_history):
             canvas = self.scatter_canvases[i]
             prev_x, prev_y = None, None
             for j, state in enumerate(history):
-                x = j * 10 + 50
-                y = 100 - (state_to_number(state) * 30)
+                x = j * int(10 * self.screen_ratio) + int(50 * self.screen_ratio)
+                y = int(100 * self.screen_ratio) - int(state_to_number(state) * 30 * self.screen_ratio)
                 if prev_x is not None and prev_y is not None:
                     canvas.create_line(prev_x, prev_y, x, y, fill="blue")
                 prev_x, prev_y = x, y
 
             # 绘制坐标轴
-            canvas.create_line(50, 100, 200, 100, arrow=tk.LAST)  # 横轴
-            canvas.create_line(50, 20, 50, 180, arrow=tk.LAST)  # 纵轴
-            canvas.create_text(200, 110, text="Time Step")
-            canvas.create_text(30, 20, text="State")
-            canvas.create_text(125, 10, text=f"Neuron {i + 1}")
+            canvas.create_line(int(50 * self.screen_ratio), int(100 * self.screen_ratio), int(200 * self.screen_ratio), int(100 * self.screen_ratio), arrow=tk.LAST)  # 横轴
+            canvas.create_line(int(50 * self.screen_ratio), int(20 * self.screen_ratio), int(50 * self.screen_ratio), int(180 * self.screen_ratio), arrow=tk.LAST)  # 纵轴
+            canvas.create_text(int(200 * self.screen_ratio), int(110 * self.screen_ratio), text="Time Step")
+            canvas.create_text(int(30 * self.screen_ratio), int(20 * self.screen_ratio), text="State")
+            canvas.create_text(int(125 * self.screen_ratio), int(10 * self.screen_ratio), font=('Arial','10'), text=f"Neuron {i + 1}")
 
     def next_step(self):
         time_steps = self.time_steps
@@ -426,6 +470,8 @@ class CircleDiagram:
             self.draw_circles()
         else:
             self.stop()
+
+
 
     def auto_step(self):
         if self.running:
