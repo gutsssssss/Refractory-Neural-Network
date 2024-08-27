@@ -3,3 +3,10 @@ Assignment of this week:
 2. Try different settings to make various neuron patterns and record them(in words and video).
 
 If you are willing to take an assignment, please @ your name at the end.
+
+## To set up the environment for this Python project, follow these steps:
+```
+python -m venv env
+source env/bin/activate  # On Windows, use `env\Scripts\activate`
+pip install -r requirements.txt
+```
