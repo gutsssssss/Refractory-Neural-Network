@@ -2,7 +2,7 @@ import pickle
 import math
 import cv2
 import numpy as np
-import arguments as arg
+# import arguments as arg
 import math_functions as mf
 from matplotlib import pyplot as plt
 import glob
@@ -14,6 +14,7 @@ import tkinter as tk
 from tkinter import ttk # ttk is used for more modern widgets
 from tkinter import Canvas, Button, Label, Entry, Radiobutton, StringVar
 from math import cos, sin, radians
+from save_load_functions import save_inputs, load_inputs, load_most_recent_inputs
 
 
 matplotlib.use('TkAgg')
@@ -246,8 +247,6 @@ class CircleDiagram:
         self.time_steps = 1000
         self.current_time_step = 0
 
-        
-
         # Initial Neuron Setting
         self.neuron_column = 0
         self.create_label("Weight Type:", 0, self.neuron_column)
@@ -276,6 +275,48 @@ class CircleDiagram:
         self.input_duration_label, self.input_duration_entry = self.create_input("Input Duration:", 4, self.input_column, "5")
         self.input_period_label, self.input_period_entry = self.create_input("Input Period:", 5, self.input_column, "1")
         self.external_input_label, self.external_input_entry = self.create_input("Input Value:", 6, self.input_column, "1,0,0,0,0,0")
+
+        # Save and Load
+        self.entries = {}
+        self.vars = {}
+
+        # Initial Neuron Setting
+        self.neuron_column = 0
+        self.create_label("Weight Type:", 0, self.neuron_column)
+        self.vars['weight_type'] = StringVar(value="custom")
+        self.create_radio_button("Random", self.vars['weight_type'], "random", 1, self.neuron_column)
+        self.create_radio_button("All the same", self.vars['weight_type'], "all the same", 2, self.neuron_column)
+        self.create_radio_button("Custom", self.vars['weight_type'], "custom", 3, self.neuron_column)
+
+        self.setting_column = 1
+        self.create_label("Neuron Setting:", 0, self.setting_column)
+        self.wb_label, self.entries['boundary'] = self.create_input("boundary:", 1, self.setting_column, "0.5,0.8")
+        self.w_label, self.entries['weight'] = self.create_input("value:", 2, self.setting_column, "0.6")
+        self.wv_label, self.entries['value_list'] = self.create_input("value list:", 3, self.setting_column, "0.4,0.6,0.7,0.5,0.6,0.9")
+        self.b_label, self.entries['bias'] = self.create_input("Bias:", 4, self.setting_column, "0.2")
+        self.t_label, self.entries['tau'] = self.create_input("τa, τrf:", 5, self.setting_column, "4,2")
+        self.f_label, self.entries['forgetting_rate'] = self.create_input("Forgetting Rate:", 6, self.setting_column, "0.3")
+        self.n_label, self.entries['neuron_number'] = self.create_input("Neuron Number:", 7, self.setting_column, str(self.neuron_number))
+
+        # Input Setting
+        self.input_column = 3
+        self.create_label("Input Type:", 0, self.input_column)
+        self.vars['input_type'] = StringVar(value="constant")
+        self.create_radio_button("OneTime", self.vars['input_type'], "one_time", 1, self.input_column)
+        self.create_radio_button("Constant", self.vars['input_type'], "constant", 2, self.input_column)
+        self.create_radio_button("Periodic", self.vars['input_type'], "periodic", 3, self.input_column)
+        self.input_duration_label, self.entries['input_duration'] = self.create_input("Input Duration:", 4, self.input_column, "5")
+        self.input_period_label, self.entries['input_period'] = self.create_input("Input Period:", 5, self.input_column, "1")
+        self.external_input_label, self.entries['external_input'] = self.create_input("Input Value:", 6, self.input_column, "1,0,0,0,0,0")
+
+        # Add Save and Load to the menu
+        menubar = tk.Menu(root)
+        filemenu = tk.Menu(menubar, tearoff=0)
+        filemenu.add_command(label="Save", command=lambda: save_inputs(self.entries, self.vars))
+        filemenu.add_command(label="Load", command=lambda: load_inputs(self.entries, self.vars))
+        filemenu.add_command(label="Load Most Recent", command=lambda: load_most_recent_inputs(self.entries, self.vars))
+        menubar.add_cascade(label="File", menu=filemenu)
+        root.config(menu=menubar)
 
         # Visualization Setting
         self.visualization_column = 0
