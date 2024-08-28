@@ -15,7 +15,7 @@ from tkinter import ttk # ttk is used for more modern widgets
 from tkinter import Canvas, Button, Label, Entry, Radiobutton, StringVar
 from math import cos, sin, radians
 from save_load_functions import save_inputs, load_inputs, load_most_recent_inputs
-
+from save_canvas_image import save_canvas
 
 matplotlib.use('TkAgg')
 class Dataset:
@@ -246,7 +246,9 @@ class CircleDiagram:
         self.neuron_number = 6
         self.time_steps = 1000
         self.current_time_step = 0
-
+        # Create total_width attribute
+        self.total_width = 0  # Initialize total_width
+        
         # Initial Neuron Setting
         self.neuron_column = 0
         self.create_label("Weight Type:", 0, self.neuron_column)
@@ -312,7 +314,9 @@ class CircleDiagram:
         # Add Save and Load to the menu
         menubar = tk.Menu(root)
         filemenu = tk.Menu(menubar, tearoff=0)
-        filemenu.add_command(label="Save", command=lambda: save_inputs(self.entries, self.vars))
+        filemenu.add_command(label="Save as CSV", command=lambda: save_inputs(self.entries, self.vars))
+        filemenu.add_command(label="Save as JPG", command=lambda: save_canvas(self.right_canvas, self.total_width))
+        filemenu.add_command(label="Save Both (CSV + JPG)", command=lambda: (save_inputs(self.entries, self.vars), save_canvas(self.right_canvas, self.total_width)))
         filemenu.add_command(label="Load", command=lambda: load_inputs(self.entries, self.vars))
         filemenu.add_command(label="Load Most Recent", command=lambda: load_most_recent_inputs(self.entries, self.vars))
         menubar.add_cascade(label="File", menu=filemenu)
@@ -343,8 +347,6 @@ class CircleDiagram:
 
         self.scrollbar.pack(side="bottom", fill="x")
         self.right_canvas.pack(side="left", fill="both", expand=True)
-
-
 
         # self.right_canvas = Canvas(root, width=int(450 * self.screen_ratio), height=(430 * self.screen_ratio))
         # self.right_canvas.grid(row = 8, column = 2, columnspan=2, padx=10, pady=10 )
@@ -472,6 +474,7 @@ class CircleDiagram:
         x_offset = 0  # Start from 0 to ensure the first step is visible
         total_width = len(self.time_steps_history[0]) * (circle_radius * 2 + spacing) + circle_radius + spacing - x_offset
         self.right_canvas.config(scrollregion=(0, 0, total_width, 500))
+        self.total_width = total_width
 
         for i, history in enumerate(self.state_history):
             for j, state in enumerate(history):
@@ -551,7 +554,6 @@ class CircleDiagram:
 
     def pause_on_entry_change(self):
         self.stop()
-
 
 def drawLoop():
     root = tk.Tk()

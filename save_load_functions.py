@@ -3,7 +3,7 @@ import os
 import glob
 import datetime
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 
 # Ensure the 'configurations' directory exists
 os.makedirs("configurations", exist_ok=True)
@@ -23,6 +23,9 @@ def save_inputs(entries, vars):
         for key, var in vars.items():
             writer.writerow([key, var.get()])
     print(f"Inputs saved to {filename}!")
+
+    # Show a messagebox indicating success
+    messagebox.showinfo("Save Successful", f"Inputs saved successfully to {filename}!")
 
 def load_inputs(entries, vars):
     # Open a file dialog to allow the user to select the CSV file
